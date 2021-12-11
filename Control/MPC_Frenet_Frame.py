@@ -57,15 +57,16 @@ class P:
 
 
 class Node:
-    def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0, direct=1.0):
+    def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0, direct=1.0,yawt=0.0):
         self.x = x
         self.y = y
         self.yaw = yaw
         self.v = v
         self.direct = direct
+        self.yawt = yawt
 
     def update(self, a, delta, direct):
-        delta = self.limit_input_delta(delta)
+        delta = self.limit_input_delta(delta)#限制角度
         self.x += self.v * math.cos(self.yaw) * P.dt
         self.y += self.v * math.sin(self.yaw) * P.dt
         self.yaw += self.v / P.WB * math.tan(delta) * P.dt
