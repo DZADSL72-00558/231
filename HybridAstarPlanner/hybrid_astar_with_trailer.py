@@ -18,9 +18,22 @@ sys.path.append(os.path.dirname(os.path.abspath('__file__')) +
 import HybridAstarPlanner.astar as astar
 import HybridAstarPlanner.draw as draw
 import CurvesGenerator.reeds_shepp as rs
+class Base:
+    factor = 1
+    RF = 3.3 * factor  # [m] distance from rear to vehicle front end of vehicle
+    RB = 0.5 * factor  # [m] distance from rear to vehicle back end of vehicle
+    W = 2.4 * factor  # [m] width of vehicle
+    WD = 0.7 * W * factor  # [m] distance between left-right wheels
+    WB = 2.5 * factor  # [m] Wheel base
+    TR = 0.44 * factor  # [m] Tyre radius
+    TW = 0.7 * factor  # [m] Tyre width
+    steer_change_max = np.deg2rad(30.0)  # maximum steering speed [rad/s]
+    speed_max = 55.0 / 3.6 * factor  # maximum speed [m/s]
+    speed_min = -20.0 / 3.6 * factor  # minimum speed [m/s]
+    acceleration_max = 1.0 * factor  # maximum acceleration [m/s2]
 
 
-class C:  # Parameter config
+class C(Base):  # Parameter config
     PI = np.pi
 
     XY_RESO = 2.0  # [m]
@@ -38,24 +51,12 @@ class C:  # Parameter config
     SCISSORS_COST = 200.0  # scissors cost
     H_COST = 10.0  # Heuristic cost
 
-    W = 3.0  # [m] width of vehicle
-    WB = 3.5  # [m] wheel base: rear to front steer
-    WD = 0.7 * W  # [m] distance between left-right wheels
-    RF = 4.5  # [m] distance from rear to vehicle front end of vehicle
-    RB = 1.0  # [m] distance from rear to vehicle back end of vehicle
-
-    RTR = 8.0  # [m] rear to trailer wheel
-    RTF = 1.0  # [m] distance from rear to vehicle front end of trailer
-    RTB = 9.0  # [m] distance from rear to vehicle back end of trailer
-    TR = 0.5  # [m] tyre radius
-    TW = 1.0  # [m] tyre width
+    RTR = 8.0 *Base.factor  # [m] rear to trailer wheel
+    RTF = 1.0*Base.factor   # [m] distance from rear to vehicle front end of trailer
+    RTB = 9.0 *Base.factor  # [m] distance from rear to vehicle back end of trailer
 
     
     MAX_STEER = np.deg2rad(45.0)  # max steering angle [rad]
-    steer_change_max = np.deg2rad(30.0)  # maximum steering speed [rad/s]
-    speed_max = 55.0 / 3.6  # maximum speed [m/s]
-    speed_min = -20.0 / 3.6  # minimum speed [m/s]
-    acceleration_max = 1.0  # maximum acceleration [m/s2]
 
 class Node:
     def __init__(self, xind, yind, yawind, direction, x, y,
@@ -616,24 +617,30 @@ linewidth=4*fator
 def design_obstacles():
     ox, oy = [], []
 
-    for i in range(0, totalwidth+1):
+    for i in range(0, totalwidth):
         ox.append(i)
         oy.append(totalhight)
 
-    for i in range(0, totalwidth+1):
+    for i in range(0, totalwidth):
         ox.append(i)
         oy.append(0)
-    for i in range(0, totalhight+1):
+    for i in range(0, totalhight):
         ox.append(0)
         oy.append(i)
-    for i in range(2*linewidth,totalwidth+1):
+    for i in range(2*linewidth,totalwidth):
         ox.append(i)
         oy.append(linewidth)
-    for i in range(2*linewidth,totalwidth+1):
+    for i in range(2*linewidth,totalwidth):
         ox.append(i)
         oy.append(totalhight-linewidth)
-    for i in range(linewidth,totalhight-linewidth+1):
+    for i in range(linewidth,totalhight-linewidth):
         ox.append(linewidth*2)
+        oy.append(i)
+    for i in range(0,linewidth+1):
+        ox.append(totalwidth)
+        oy.append(i)
+    for i in range(totalhight-linewidth, totalhight+1):
+        ox.append(totalwidth)
         oy.append(i)
     return ox, oy
 #%%
@@ -697,13 +704,9 @@ def test(x, y, yaw, yawt, ox, oy):
 
 '''
 print("start!")
-
-sx, sy = linewidth*2+C.RF, totalhight-linewidth/2  # [m]
-syaw0 = np.deg2rad(180.0)
+sx, sy, syaw0 = linewidth*2+C.RF, linewidth/2, np.deg2rad(180.0)
+gx, gy, gyaw0 = linewidth*2+C.RF, totalhight-linewidth/2, np.deg2rad(0.0)
 syawt = np.deg2rad(180.0)
-
-gx, gy = linewidth*2+C.RF, linewidth/2  # [m]
-gyaw0 = np.deg2rad(0.0)
 gyawt = np.deg2rad(0.0)
 
 ox, oy = design_obstacles()
@@ -711,6 +714,7 @@ plt.plot(ox, oy, 'sk')
 draw_model(sx, sy, syaw0, syawt, 0.0)
 draw_model(gx, gy, gyaw0, gyawt, 0.0)
 plt.show()
+print("example done")
 #%%
 # test(sx, sy, syaw0, syawt, 3.5, 32)
 # plt.axis("equal")
@@ -720,6 +724,15 @@ oox, ooy = ox[:], oy[:]
 t0 = time.time()
 path = hybrid_astar_planning(sx, sy, syaw0, syawt, gx, gy, gyaw0, gyawt,
                              oox, ooy, C.XY_RESO, C.YAW_RESO)
+print("planing done")
+t1 = time.time()
+print("running T: ", t1 - t0)
+
+if not path:
+    print("Searching failed!")
+    exit()
+#%%
+print(1)
 #%%
 #MPC
 """
@@ -733,10 +746,6 @@ import math
 import cvxpy
 import numpy as np
 import matplotlib.pyplot as plt
-
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) +
-                "/../../MotionPlanning/")
-
 import Control.draw as draw
 import CurvesGenerator.reeds_shepp as rs
 import CurvesGenerator.cubic_spline as cs
@@ -765,22 +774,10 @@ class P:
     du_res = 0.1  # threshold for stopping iteration
 
     # vehicle config
-    RF = 3.3  # [m] distance from rear to vehicle front end of vehicle
-    RB = 0.8  # [m] distance from rear to vehicle back end of vehicle
-    W = 2.4  # [m] width of vehicle
-    WD = 0.7 * W  # [m] distance between left-right wheels
-    WB = 2.5  # [m] Wheel base
-    TR = 0.44  # [m] Tyre radius
-    TW = 0.7  # [m] Tyre width
-
     steer_max = np.deg2rad(45.0)  # max steering angle [rad]
-    steer_change_max = np.deg2rad(30.0)  # maximum steering speed [rad/s]
-    speed_max = 55.0 / 3.6  # maximum speed [m/s]
-    speed_min = -20.0 / 3.6  # minimum speed [m/s]
-    acceleration_max = 1.0  # maximum acceleration [m/s2]
 
 
-class Node:
+class Node2:
     def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0, direct=1.0):
         self.x = x
         self.y = y
@@ -934,7 +931,7 @@ def predict_states_in_T_step(z0, a, delta, z_ref):
     for i in range(P.NX):
         z_bar[i, 0] = z0[i]
 
-    node = Node(x=z0[0], y=z0[1], v=z0[2], yaw=z0[3])
+    node = Node2(x=z0[0], y=z0[1], v=z0[2], yaw=z0[3])
 
     for ai, di, i in zip(a, delta, range(1, P.T + 1)):
         node.update(ai, di, 1.0)
@@ -1080,7 +1077,7 @@ cyaw=path.yaw
 sp = calc_speed_profile(cx, cy, cyaw, P.target_speed)
 
 ref_path = PATH(cx, cy, cyaw)
-node = Node(x=cx[0], y=cy[0], yaw=cyaw[0], v=0.0)
+node = Node2(x=cx[0], y=cy[0], yaw=cyaw[0], v=0.0)
 
 time = 0.0
 x = [node.x]
@@ -1093,7 +1090,7 @@ a = [0.0]
 #%%
 delta_opt, a_opt = None, None
 a_exc, delta_exc = 0.0, 0.0
-
+i=0
 while time < P.time_max:
     z_ref, target_ind = \
         calc_ref_trajectory_in_T_step(node, ref_path, sp)
@@ -1125,10 +1122,10 @@ while time < P.time_max:
 
     dy = (node.yaw - yaw[-2]) / (node.v * P.dt)
     steer = rs.pi_2_pi(-math.atan(P.WB * dy))
-    steer = rs.pi_2_pi(-math.atan(P.WB * dy))
 
     plt.cla()
-    draw.draw_car(node.x, node.y, node.yaw, steer, P)
+    draw_model(node.x, node.y, node.yaw, path.yawt[i],steer)
+    i+=1
     plt.gcf().canvas.mpl_connect('key_release_event',
                                  lambda event:
                                  [exit(0) if event.key == 'escape' else None])
@@ -1143,4 +1140,5 @@ while time < P.time_max:
     plt.title("Linear MPC, " + "v = " + str(round(node.v * 3.6, 2)))
     plt.pause(0.001)
 
+print("done")
 plt.show()
